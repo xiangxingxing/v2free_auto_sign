@@ -5,32 +5,96 @@ name: V2FreeSignIn
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  # push:
+  #   branches: [ "main" ]
+  # pull_request:
+  #   branches: [ "main" ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+  watch:
+    types: [ started ]
+  schedule:
+    - cron: '7 16 * * *'
+
+permissions:
+  actions: write
+  checks: write
+  contents: write
+  deployments: write
+  issues: write
+  packages: write
+  pull-requests: write
+  repository-projects: write
+  security-events: write
+  statuses: write
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
-  build:
+  sign-in:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
 
       # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      # - name: Run a one-line script
+      #   run: echo Hello, world!
 
       # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      # - name: Run a multi-line script
+      #   run: |
+      #     echo Add other actions to build,
+      #     echo test, and deploy your project.
+
+       - name: Install Python
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          sudo apt update && \
+          sudo apt install python3
+      
+      - name: requirements
+        run: |
+          pip3 install -r requirements.txt
+
+       - name: Checkin
+        run: |
+          user='${{ secrets.USER }}'
+          pwd='${{ secrets.PWD }}'
+          
+          user_list=()
+          pwd_list=()
+          IFS=","
+          for u in ${user[*]}
+          do
+          user_list[${#user_list[*]}]=${u}
+          done
+          for p in ${pwd[*]}
+          do
+          pwd_list[${#pwd_list[*]}]=${p}
+          done
+          user_num=${#user_list[*]}
+          pwd_num=${#pwd_list[*]}
+          if [ $user_num != $pwd_num ];then
+          echo "账号和密码个数不对应"
+          exit 1
+          else
+          echo "共有 $user_num 个账号，即将开始签到"
+          fi
+          for ((i=0;i<$user_num;i++))
+          do
+          python3 auto_sign_in.py --username ${user_list[$i]} --password ${pwd_list[$i]}
+          done
+      - name: Commit
+        run: |
+          git config --global user.email buaaxxx1995@gmail.com
+          git config --global user.name xiangxingxing
+          git add .
+          git commit -m "Update flow.log" -a
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
